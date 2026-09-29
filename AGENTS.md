@@ -60,5 +60,7 @@ Do not use map mechanics, room layouts, or individual level concepts as the game
 - Preserve working behavior when refactoring.
 - Test gameplay changes before committing them when practical.
 - Keep public documentation aligned with the current game behavior.
+- Keep room layouts, room connections, platforms, enemies, keys, switches, and other level-specific configuration in `levels.py` rather than embedding them in `main.py`.
+- Keep reusable room/entity data structures in `models.py`; keep the main loop, physics, collision, combat, input, and rendering framework in `main.py`.
 - Store README screenshots and other public project images under `image/`.
 - Verify all image assets are safe for public release before committing them.
