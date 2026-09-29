@@ -11,7 +11,10 @@ WIDTH, HEIGHT = 960, 600
 FPS = 60
 GRAVITY = 0.75
 MOVE_SPEED = 4.5
-JUMP_SPEED = -13.5
+JUMP_SPEED = -15.75
+COYOTE_FRAMES = 7
+JUMP_BUFFER_FRAMES = 8
+RUN_FRAME_MS = 90
 
 WHITE = (250, 250, 247)
 BLACK = (17, 17, 20)
@@ -43,6 +46,8 @@ class Game:
         self.bullets = []
         self.enemy_bullets = []
         self.door_cooldown = 0
+        self.coyote_frames = 0
+        self.jump_buffer_frames = 0
 
     @property
     def player_rect(self):
@@ -58,6 +63,8 @@ class Game:
         self.bullets.clear()
         self.enemy_bullets.clear()
         self.door_cooldown = 16
+        self.coyote_frames = 0
+        self.jump_buffer_frames = 0
 
     def try_move(self, dx, dy):
         rect = self.player_rect
@@ -73,17 +80,28 @@ class Game:
         self.x = rect.centerx
 
         rect.y += int(dy)
-        self.on_ground = False
+        landed = False
         for solid in solids:
             if rect.colliderect(solid):
                 if dy > 0:
                     rect.bottom = solid.top
                     self.vy = 0
-                    self.on_ground = True
+                    landed = True
                 elif dy < 0:
                     rect.top = solid.bottom
                     self.vy = 0
+
+        # A one-pixel ground probe keeps the grounded state stable even when
+        # sub-pixel gravity produces int(dy) == 0 on a frame.
+        ground_probe = rect.move(0, 1)
+        self.on_ground = landed or any(
+            ground_probe.colliderect(solid) for solid in solids
+        )
         self.y = rect.bottom
+
+    def queue_jump(self):
+        # Buffer jump input briefly so a press just before landing still works.
+        self.jump_buffer_frames = JUMP_BUFFER_FRAMES
 
     def update_player(self, keys):
         self.vx = 0
@@ -93,6 +111,22 @@ class Game:
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
             self.vx = MOVE_SPEED
             self.facing = 1
+
+        if self.on_ground:
+            self.coyote_frames = COYOTE_FRAMES
+        elif self.coyote_frames > 0:
+            self.coyote_frames -= 1
+
+        if self.jump_buffer_frames > 0:
+            self.jump_buffer_frames -= 1
+
+        # Buffered jump + coyote time makes both standing jumps and running
+        # jumps reliable without changing horizontal movement behavior.
+        if self.jump_buffer_frames > 0 and self.coyote_frames > 0:
+            self.vy = JUMP_SPEED
+            self.on_ground = False
+            self.coyote_frames = 0
+            self.jump_buffer_frames = 0
 
         self.vy += GRAVITY
         self.try_move(self.vx, 0)
@@ -232,53 +266,106 @@ class Game:
                 enemy.cooldown = 85
 
     def build_player_sprites(self):
-        right_frames = [
-            self.make_player_sprite(run_frame=0),
-            self.make_player_sprite(run_frame=1),
+        """Build idle, jump, and three-frame running sprites for both directions."""
+        right_run = [
+            self.make_player_sprite("run", frame=0),
+            self.make_player_sprite("run", frame=1),
+            self.make_player_sprite("run", frame=2),
         ]
-        right_idle = self.make_player_sprite(run_frame=None)
+        right_idle = self.make_player_sprite("idle")
+        right_jump = self.make_player_sprite("jump")
 
         return {
-            1: {"idle": right_idle, "run": right_frames},
+            1: {"idle": right_idle, "jump": right_jump, "run": right_run},
             -1: {
                 "idle": pygame.transform.flip(right_idle, True, False),
+                "jump": pygame.transform.flip(right_jump, True, False),
                 "run": [
                     pygame.transform.flip(frame, True, False)
-                    for frame in right_frames
+                    for frame in right_run
                 ],
             },
         }
 
-    def make_player_sprite(self, run_frame):
-        surface = pygame.Surface((42, 58), pygame.SRCALPHA)
+    def draw_jointed_limb(self, surface, start, joint, end, width=3):
+        """Draw one limb as two segments so elbows/knees read clearly."""
+        pygame.draw.line(surface, PLAYER_COLOR, start, joint, width)
+        pygame.draw.line(surface, PLAYER_COLOR, joint, end, width)
 
-        pygame.draw.circle(surface, PLAYER_COLOR, (21, 9), 8, 2)
-        pygame.draw.line(surface, PLAYER_COLOR, (21, 17), (21, 37), 3)
+    def make_player_sprite(self, pose, frame=0):
+        surface = pygame.Surface((50, 62), pygame.SRCALPHA)
 
-        if run_frame is None:
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 23), (33, 29), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 23), (11, 29), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 37), (31, 55), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 37), (11, 55), 3)
-        elif run_frame == 0:
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 23), (35, 18), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 23), (9, 32), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 37), (36, 49), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 37), (9, 55), 3)
-        else:
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 23), (34, 32), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 23), (8, 18), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 37), (34, 55), 3)
-            pygame.draw.line(surface, PLAYER_COLOR, (21, 37), (8, 49), 3)
+        # The torso leans slightly toward the running direction.
+        head = (27, 9)
+        neck = (25, 18)
+        shoulder = (24, 23)
+        hip = (21, 40)
 
+        pygame.draw.circle(surface, PLAYER_COLOR, head, 8, 2)
+        pygame.draw.line(surface, PLAYER_COLOR, neck, hip, 3)
+
+        if pose == "idle":
+            self.draw_jointed_limb(surface, shoulder, (34, 27), (39, 36))
+            self.draw_jointed_limb(surface, shoulder, (14, 27), (10, 36))
+            self.draw_jointed_limb(surface, hip, (31, 48), (36, 59))
+            self.draw_jointed_limb(surface, hip, (13, 49), (9, 59))
+            return surface
+
+        if pose == "jump":
+            self.draw_jointed_limb(surface, shoulder, (35, 18), (42, 25))
+            self.draw_jointed_limb(surface, shoulder, (14, 18), (8, 26))
+            self.draw_jointed_limb(surface, hip, (32, 44), (37, 54))
+            self.draw_jointed_limb(surface, hip, (13, 43), (8, 52))
+            return surface
+
+        # Three run phases. Arms are made from upper-arm + forearm segments,
+        # and the opposite arm/leg swing is reversed across the stride.
+        run_poses = (
+            {
+                "front_arm": ((35, 18), (42, 27)),
+                "back_arm": ((14, 29), (8, 38)),
+                "front_leg": ((33, 45), (42, 54)),
+                "back_leg": ((12, 49), (6, 59)),
+            },
+            {
+                "front_arm": ((34, 25), (39, 34)),
+                "back_arm": ((15, 23), (9, 29)),
+                "front_leg": ((29, 49), (38, 59)),
+                "back_leg": ((15, 46), (10, 57)),
+            },
+            {
+                "front_arm": ((33, 30), (39, 39)),
+                "back_arm": ((14, 18), (8, 27)),
+                "front_leg": ((13, 48), (7, 58)),
+                "back_leg": ((32, 45), (41, 55)),
+            },
+        )
+
+        pose_data = run_poses[frame % len(run_poses)]
+        self.draw_jointed_limb(
+            surface, shoulder, pose_data["front_arm"][0], pose_data["front_arm"][1]
+        )
+        self.draw_jointed_limb(
+            surface, shoulder, pose_data["back_arm"][0], pose_data["back_arm"][1]
+        )
+        self.draw_jointed_limb(
+            surface, hip, pose_data["front_leg"][0], pose_data["front_leg"][1]
+        )
+        self.draw_jointed_limb(
+            surface, hip, pose_data["back_leg"][0], pose_data["back_leg"][1]
+        )
         return surface
 
     def draw_player(self):
-        if abs(self.vx) > 0.1:
-            frame_index = (pygame.time.get_ticks() // 110) % 2
-            sprite = self.player_sprites[self.facing]["run"][frame_index]
+        sprites = self.player_sprites[self.facing]
+
+        if not self.on_ground:
+            sprite = sprites["jump"]
+        elif abs(self.vx) > 0.1:
+            frame_index = (pygame.time.get_ticks() // RUN_FRAME_MS) % 3
+            sprite = sprites["run"][frame_index]
         else:
-            sprite = self.player_sprites[self.facing]["idle"]
+            sprite = sprites["idle"]
 
         rect = sprite.get_rect(midbottom=(int(self.x), int(self.y)))
         self.screen.blit(sprite, rect)
@@ -523,11 +610,8 @@ class Game:
                         sys.exit()
                     if event.key == pygame.K_r:
                         self.reset()
-                    if (
-                        event.key in (pygame.K_UP, pygame.K_w, pygame.K_SPACE)
-                        and self.on_ground
-                    ):
-                        self.vy = JUMP_SPEED
+                    if event.key in (pygame.K_UP, pygame.K_w, pygame.K_SPACE):
+                        self.queue_jump()
                     if event.key in (pygame.K_z, pygame.K_j, pygame.K_LCTRL):
                         self.use_action()
 
