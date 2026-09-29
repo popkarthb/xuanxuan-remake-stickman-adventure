@@ -1,187 +1,255 @@
 import pygame
 
-from models import Door, Enemy, Pickup, Room
+from models import BreakablePlatform, Door, DoorLink, Enemy, ItemPickup, Room
 
 
 WIDTH = 960
 HEIGHT = 600
 FLOOR_Y = 550
 
+START_ROOM = "room_01"
+START_SPAWN = "start"
 
-def make_rooms() -> dict[str, Room]:
-    """Build the current prototype rooms.
 
-    Keep room layout, connections, enemies, pickups, keys and switches here.
-    The game loop and player physics belong in main.py.
+def build_world() -> tuple[dict[str, Room], dict[tuple[str, str], DoorLink]]:
+    """Build the memory-map prototype and its temporary directional routes.
+
+    The room geometry follows the eight-room hand-drawn memory sketch.
+    Door routing below is intentionally a DEMO only. Routes are directional:
+    there is no assumption that walking back through a destination door returns
+    to the room the player came from.
     """
     floor = pygame.Rect(0, FLOOR_Y, WIDTH, HEIGHT - FLOOR_Y)
 
-    return {
-        # Central prototype hub.
-        # Extra connector platforms keep every level reachable with the
-        # standard jump physics while the final map is still being designed.
-        "hub": Room(
-            (95, 88, 112),
-            [
+    rooms = {
+        # 1. Six-door hub: three doors on each side at three elevations.
+        "room_01": Room(
+            color=(224, 218, 205),
+            platforms=[
                 floor,
-                pygame.Rect(305, 500, 350, 18),
-                pygame.Rect(385, 435, 190, 18),
-                pygame.Rect(0, 365, 305, 18),
-                pygame.Rect(655, 365, 305, 18),
-                pygame.Rect(260, 275, 440, 18),
-                pygame.Rect(0, 180, 220, 18),
-                pygame.Rect(740, 180, 220, 18),
+                pygame.Rect(0, 440, 305, 18),
+                pygame.Rect(655, 440, 305, 18),
+                pygame.Rect(0, 330, 235, 18),
+                pygame.Rect(725, 330, 235, 18),
             ],
-            [
-                Door(35, 82, "crimson", (125, 550)),
-                Door(859, 82, "cobalt", (125, 550)),
-                Door(35, 267, "forest", (125, 550)),
-                Door(859, 267, "amber", (125, 550)),
-                Door(35, 452, "violet", (125, 550)),
-                Door(859, 452, "slate", (125, 550)),
+            doors=[
+                Door("left_bottom", 35, 452),
+                Door("right_bottom", 859, 452),
+                Door("left_middle", 35, 342),
+                Door("right_middle", 859, 342),
+                Door("left_top", 35, 232),
+                Door("right_top", 859, 232, key_id="gold_key"),
             ],
-            title="STICKMAN ADVENTURE",
+            spawns={
+                "start": (480, 550),
+                "return_center": (480, 550),
+            },
         ),
-        "crimson": Room(
-            (190, 63, 62),
-            [
-                floor,
-                pygame.Rect(280, 440, 175, 18),
-                pygame.Rect(555, 335, 145, 18),
-                pygame.Rect(350, 245, 180, 18),
-                pygame.Rect(0, 220, 205, 18),
-                pygame.Rect(755, 220, 205, 18),
+
+        # 2. Simple two-door room.
+        "room_02": Room(
+            color=(218, 226, 232),
+            platforms=[floor],
+            doors=[
+                Door("left_bottom", 35, 452),
+                Door("right_bottom", 859, 452),
             ],
-            [
-                Door(35, 452, "hub", (865, 550)),
-                Door(859, 122, "abyss", (115, 550), key_id="red_key"),
-            ],
-            enemies=[Enemy(480, 550, -1, 70)],
-            ammo=[pygame.Rect(320, 410, 18, 18)],
-            keys=[Pickup(pygame.Rect(820, 185, 18, 18), "red_key")],
-            title="CRIMSON",
+            spawns={
+                "left_entry": (140, 550),
+                "right_entry": (820, 550),
+            },
         ),
-        "cobalt": Room(
-            (50, 100, 170),
-            [
+
+        # 3. Lower-left door, upper-left shelf, and raised right-side block.
+        "room_03": Room(
+            color=(226, 221, 211),
+            platforms=[
                 floor,
-                pygame.Rect(325, 440, 310, 18),
-                pygame.Rect(0, 330, 240, 18),
-                pygame.Rect(720, 330, 240, 18),
-                pygame.Rect(415, 270, 130, 18),
+                pygame.Rect(0, 325, 210, 18),
+                pygame.Rect(300, 435, 660, 115),
             ],
-            [
-                Door(35, 452, "hub", (865, 550)),
-                Door(859, 232, "abyss", (115, 550), flag_id="blue_switch"),
+            doors=[
+                Door("left_bottom", 35, 452),
+                Door("left_upper", 35, 227),
+                Door("right_raised", 859, 337),
             ],
-            enemies=[Enemy(760, 550, -1, 105)],
-            switches=[Pickup(pygame.Rect(465, 235, 24, 24), "blue_switch")],
-            title="COBALT",
+            spawns={
+                "bottom_entry": (140, 550),
+                "upper_left": (150, 325),
+                "raised_right": (800, 435),
+            },
         ),
-        "forest": Room(
-            (66, 137, 91),
-            [
+
+        # 4. Two high doors with a descending staircase and a lower-right door.
+        "room_04": Room(
+            color=(218, 226, 215),
+            platforms=[
                 floor,
-                pygame.Rect(360, 440, 240, 18),
-                pygame.Rect(285, 330, 165, 18),
-                pygame.Rect(500, 285, 150, 18),
-                pygame.Rect(0, 205, 280, 18),
-                pygame.Rect(680, 205, 280, 18),
+                pygame.Rect(0, 220, 220, 18),
+                pygame.Rect(760, 220, 200, 18),
+                pygame.Rect(220, 280, 140, 270),
+                pygame.Rect(360, 340, 140, 210),
+                pygame.Rect(500, 400, 140, 150),
+                pygame.Rect(640, 460, 120, 90),
             ],
-            [
-                Door(35, 452, "hub", (865, 550)),
-                Door(859, 107, "crimson", (120, 550)),
+            doors=[
+                Door("left_upper", 35, 122),
+                Door("right_upper", 859, 122),
+                Door("right_bottom", 859, 452),
             ],
-            enemies=[Enemy(525, 285, -1, 85)],
-            ammo=[pygame.Rect(165, 170, 18, 18)],
-            title="FOREST",
+            spawns={
+                "upper_left": (150, 220),
+                "upper_right": (810, 220),
+                "bottom_right": (800, 550),
+            },
         ),
-        "amber": Room(
-            (194, 138, 48),
-            [
+
+        # 5. Three-door room with floating platforms through the center.
+        "room_05": Room(
+            color=(232, 225, 211),
+            platforms=[
                 floor,
-                pygame.Rect(265, 450, 130, 18),
-                pygame.Rect(490, 350, 130, 18),
-                pygame.Rect(645, 265, 90, 18),
-                pygame.Rect(0, 250, 180, 18),
-                pygame.Rect(780, 250, 180, 18),
+                pygame.Rect(0, 280, 210, 18),
+                pygame.Rect(300, 420, 220, 18),
+                pygame.Rect(390, 340, 220, 18),
+                pygame.Rect(690, 300, 170, 18),
             ],
-            [
-                Door(35, 452, "hub", (865, 550)),
-                Door(859, 152, "vault", (115, 550)),
+            doors=[
+                Door("left_upper", 35, 182),
+                Door("left_bottom", 35, 452),
+                Door("right_bottom", 859, 452),
             ],
-            enemies=[Enemy(665, 265, -1, 90), Enemy(530, 350, 1, 125)],
-            title="AMBER",
+            spawns={
+                "upper_left": (150, 280),
+                "bottom_left": (140, 550),
+                "bottom_right": (820, 550),
+            },
         ),
-        "violet": Room(
-            (123, 79, 159),
-            [
+
+        # 6. Item room. Upper walkway can be drilled through in the center.
+        # Entering on the upper level can become a one-way drop to the bottom.
+        "room_06": Room(
+            color=(220, 217, 228),
+            platforms=[
                 floor,
-                pygame.Rect(315, 440, 150, 18),
-                pygame.Rect(505, 325, 110, 18),
-                pygame.Rect(395, 215, 165, 18),
-                pygame.Rect(0, 300, 250, 18),
-                pygame.Rect(710, 300, 250, 18),
+                pygame.Rect(0, 220, 400, 18),
+                pygame.Rect(560, 220, 400, 18),
             ],
-            [
-                Door(35, 452, "hub", (865, 550)),
-                Door(859, 202, "vault", (115, 550), key_id="violet_key"),
+            breakables=[
+                BreakablePlatform(pygame.Rect(400, 220, 160, 18), "upper_floor"),
             ],
-            keys=[Pickup(pygame.Rect(455, 180, 18, 18), "violet_key")],
-            title="VIOLET",
+            doors=[
+                Door("left_upper", 35, 122),
+                Door("right_upper", 859, 122),
+                Door("right_bottom", 859, 452),
+            ],
+            spawns={
+                "upper_left": (150, 220),
+                "upper_right": (810, 220),
+                "bottom_right": (800, 550),
+            },
+            items=[
+                ItemPickup(pygame.Rect(375, 516, 32, 26), "gun", "gun"),
+                ItemPickup(pygame.Rect(475, 514, 32, 28), "drill", "drill"),
+                ItemPickup(pygame.Rect(575, 510, 38, 32), "chest", "treasure_chest"),
+            ],
         ),
-        "slate": Room(
-            (83, 94, 103),
-            [
+
+        # 7. Three stacked doors on the left and one door on the high right block.
+        "room_07": Room(
+            color=(224, 220, 213),
+            platforms=[
                 floor,
-                pygame.Rect(300, 435, 150, 18),
-                pygame.Rect(520, 435, 150, 18),
-                pygame.Rect(405, 315, 150, 18),
-                pygame.Rect(0, 235, 230, 18),
-                pygame.Rect(730, 235, 230, 18),
+                pygame.Rect(0, 440, 220, 18),
+                pygame.Rect(0, 330, 220, 18),
+                pygame.Rect(300, 250, 660, 300),
             ],
-            [
-                Door(35, 452, "hub", (865, 550)),
-                Door(859, 137, "cobalt", (115, 550)),
+            doors=[
+                Door("left_bottom", 35, 452),
+                Door("left_middle", 35, 342),
+                Door("left_top", 35, 232),
+                Door("right_upper", 859, 152),
             ],
-            enemies=[Enemy(475, 550, -1, 100)],
-            ammo=[pygame.Rect(455, 280, 18, 18)],
-            title="SLATE",
+            spawns={
+                "left_bottom": (140, 550),
+                "left_middle": (150, 440),
+                "left_top": (150, 330),
+                "upper_right": (800, 250),
+            },
+            enemies=[
+                Enemy(560, 250, -1, 95),
+            ],
         ),
-        "abyss": Room(
-            (34, 37, 52),
-            [
+
+        # 8. Stair room with the key at the top-right.
+        "room_08": Room(
+            color=(214, 224, 226),
+            platforms=[
                 floor,
-                pygame.Rect(250, 435, 140, 18),
-                pygame.Rect(565, 435, 140, 18),
-                pygame.Rect(410, 315, 135, 18),
-                pygame.Rect(300, 215, 150, 18),
-                pygame.Rect(0, 180, 210, 18),
-                pygame.Rect(750, 180, 210, 18),
+                pygame.Rect(260, 480, 120, 70),
+                pygame.Rect(380, 410, 120, 140),
+                pygame.Rect(500, 340, 120, 210),
+                pygame.Rect(620, 270, 120, 280),
+                pygame.Rect(740, 200, 220, 350),
             ],
-            [
-                Door(35, 452, "crimson", (865, 550)),
-                Door(859, 82, "vault", (115, 550)),
+            doors=[
+                Door("left_bottom", 35, 452),
             ],
-            enemies=[Enemy(455, 315, -1, 65), Enemy(625, 435, 1, 95)],
-            title="ABYSS",
-        ),
-        "vault": Room(
-            (40, 44, 46),
-            [
-                floor,
-                pygame.Rect(300, 445, 360, 18),
-                pygame.Rect(390, 330, 180, 18),
-                pygame.Rect(445, 215, 70, 18),
-                pygame.Rect(0, 270, 230, 18),
-                pygame.Rect(730, 270, 230, 18),
+            spawns={
+                "bottom_left": (140, 550),
+            },
+            items=[
+                ItemPickup(pygame.Rect(835, 160, 26, 24), "key", "gold_key"),
             ],
-            [
-                Door(35, 452, "amber", (865, 550)),
-                Door(859, 172, "hub", (115, 550)),
-            ],
-            enemies=[Enemy(350, 445, 1, 75), Enemy(610, 445, -1, 75)],
-            ammo=[pygame.Rect(470, 180, 18, 18)],
-            title="THE INNER VAULT",
         ),
     }
+
+    # Temporary demo routing.
+    #
+    # IMPORTANT: These links are directional. A reverse link must be declared
+    # separately. Several exits intentionally converge on room_01:return_center
+    # to demonstrate many-to-one and one-way door behavior.
+    links = {
+        # Hub -> six main destinations.
+        ("room_01", "left_bottom"): DoorLink("room_02", "left_entry"),
+        ("room_01", "right_bottom"): DoorLink("room_03", "bottom_entry"),
+        ("room_01", "left_middle"): DoorLink("room_04", "bottom_right"),
+        ("room_01", "right_middle"): DoorLink("room_05", "bottom_left"),
+        ("room_01", "left_top"): DoorLink("room_06", "bottom_right"),
+        ("room_01", "right_top"): DoorLink("room_07", "left_bottom"),
+
+        # Room 2 gives access to the key stair room.
+        ("room_02", "left_bottom"): DoorLink("room_01", "return_center"),
+        ("room_02", "right_bottom"): DoorLink("room_08", "bottom_left"),
+
+        # Room 3 demonstrates entering room 6 from its upper level.
+        ("room_03", "left_bottom"): DoorLink("room_01", "return_center"),
+        ("room_03", "left_upper"): DoorLink("room_05", "upper_left"),
+        ("room_03", "right_raised"): DoorLink("room_06", "upper_left"),
+
+        # Room 4 has intentionally non-symmetric exits.
+        ("room_04", "left_upper"): DoorLink("room_01", "return_center"),
+        ("room_04", "right_upper"): DoorLink("room_03", "upper_left"),
+        ("room_04", "right_bottom"): DoorLink("room_01", "return_center"),
+
+        # Room 5.
+        ("room_05", "left_upper"): DoorLink("room_06", "upper_right"),
+        ("room_05", "left_bottom"): DoorLink("room_01", "return_center"),
+        ("room_05", "right_bottom"): DoorLink("room_04", "bottom_right"),
+
+        # Room 6: upper exits continue elsewhere; lower exit returns to hub.
+        ("room_06", "left_upper"): DoorLink("room_03", "upper_left"),
+        ("room_06", "right_upper"): DoorLink("room_05", "upper_left"),
+        ("room_06", "right_bottom"): DoorLink("room_01", "return_center"),
+
+        # Room 7 is gated from the hub by gold_key.
+        ("room_07", "left_bottom"): DoorLink("room_01", "return_center"),
+        ("room_07", "left_middle"): DoorLink("room_02", "right_entry"),
+        ("room_07", "left_top"): DoorLink("room_04", "upper_left"),
+        ("room_07", "right_upper"): DoorLink("room_06", "upper_right"),
+
+        # Key room returns to the common hub spawn instead of back to room 2.
+        ("room_08", "left_bottom"): DoorLink("room_01", "return_center"),
+    }
+
+    return rooms, links
