@@ -97,6 +97,8 @@ class Game:
         self.on_ground = landed or any(
             ground_probe.colliderect(solid) for solid in solids
         )
+        if self.on_ground and dy >= 0:
+            self.vy = 0
         self.y = rect.bottom
 
     def queue_jump(self):
