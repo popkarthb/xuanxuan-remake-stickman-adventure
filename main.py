@@ -63,7 +63,7 @@ class Room:
 def make_rooms():
     floor = pygame.Rect(0, 550, WIDTH, 50)
     return {
-        # Screen 1: all six doors are always available and lead to six regions.
+        # Screen 1: the central hub connects to six regions.
         "hub": Room(
             (95, 88, 112),
             [floor, pygame.Rect(0, 365, 305, 18), pygame.Rect(655, 365, 305, 18),
@@ -72,7 +72,7 @@ def make_rooms():
             [Door(35, 82, "crimson", (125, 550), "I"), Door(859, 82, "cobalt", (125, 550), "II"),
              Door(35, 267, "forest", (125, 550), "III"), Door(859, 267, "amber", (125, 550), "IV"),
              Door(35, 452, "violet", (125, 550), "V"), Door(859, 452, "slate", (125, 550), "VI")],
-            title="THE SIX DOORS"
+            title="STICKMAN ADVENTURE"
         ),
         # Screen 2
         "crimson": Room(
@@ -171,7 +171,7 @@ def make_rooms():
 class Game:
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("The Six Doors")
+        pygame.display.set_caption("Stickman Adventure")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("consolas", 20)
