@@ -1,8 +1,10 @@
 import math
 import sys
-from dataclasses import dataclass, field
 
 import pygame
+
+from levels import make_rooms
+from models import Door
 
 
 WIDTH, HEIGHT = 960, 600
@@ -12,160 +14,8 @@ MOVE_SPEED = 4.5
 JUMP_SPEED = -13.5
 WHITE = (250, 250, 247)
 BLACK = (17, 17, 20)
-
-
-@dataclass
-class Door:
-    x: int
-    y: int
-    target: str
-    spawn: tuple[int, int]
-    label: str = ""
-    key_id: str | None = None
-    flag_id: str | None = None
-
-    @property
-    def rect(self):
-        return pygame.Rect(self.x, self.y, 66, 98)
-
-
-@dataclass
-class Pickup:
-    rect: pygame.Rect
-    item_id: str = ""
-
-
-@dataclass
-class Enemy:
-    x: float
-    y: float
-    facing: int = -1
-    cooldown: int = 80
-    alive: bool = True
-
-    @property
-    def rect(self):
-        return pygame.Rect(int(self.x - 12), int(self.y - 50), 24, 50)
-
-
-@dataclass
-class Room:
-    color: tuple[int, int, int]
-    platforms: list[pygame.Rect]
-    doors: list[Door]
-    enemies: list[Enemy] = field(default_factory=list)
-    ammo: list[pygame.Rect] = field(default_factory=list)
-    keys: list[Pickup] = field(default_factory=list)
-    switches: list[Pickup] = field(default_factory=list)
-    title: str = ""
-
-
-def make_rooms():
-    floor = pygame.Rect(0, 550, WIDTH, 50)
-    return {
-        # Screen 1: the central hub connects to six regions.
-        "hub": Room(
-            (95, 88, 112),
-            [floor, pygame.Rect(0, 365, 305, 18), pygame.Rect(655, 365, 305, 18),
-             pygame.Rect(0, 180, 220, 18), pygame.Rect(740, 180, 220, 18),
-             pygame.Rect(305, 500, 350, 18), pygame.Rect(385, 445, 190, 18)],
-            [Door(35, 82, "crimson", (125, 550), "I"), Door(859, 82, "cobalt", (125, 550), "II"),
-             Door(35, 267, "forest", (125, 550), "III"), Door(859, 267, "amber", (125, 550), "IV"),
-             Door(35, 452, "violet", (125, 550), "V"), Door(859, 452, "slate", (125, 550), "VI")],
-            title="STICKMAN ADVENTURE"
-        ),
-        # Screen 2
-        "crimson": Room(
-            (190, 63, 62),
-            [floor, pygame.Rect(0, 220, 205, 18), pygame.Rect(755, 220, 205, 18),
-             pygame.Rect(280, 400, 175, 18), pygame.Rect(555, 315, 145, 18)],
-            [Door(35, 452, "hub", (865, 550), "HUB"),
-             Door(859, 122, "abyss", (115, 550), "KEY", key_id="red_key")],
-            enemies=[Enemy(480, 550, -1, 70)],
-            ammo=[pygame.Rect(320, 370, 18, 18)],
-            keys=[Pickup(pygame.Rect(820, 185, 18, 18), "red_key")],
-            title="CRIMSON"
-        ),
-        # Screen 3
-        "cobalt": Room(
-            (50, 100, 170),
-            [floor, pygame.Rect(0, 330, 240, 18), pygame.Rect(720, 330, 240, 18),
-             pygame.Rect(325, 440, 310, 18), pygame.Rect(415, 270, 130, 18)],
-            [Door(35, 452, "hub", (865, 550), "HUB"),
-             Door(859, 232, "abyss", (115, 550), "SW", flag_id="blue_switch")],
-            enemies=[Enemy(760, 550, -1, 105)],
-            switches=[Pickup(pygame.Rect(465, 235, 24, 24), "blue_switch")],
-            title="COBALT"
-        ),
-        # Screen 4
-        "forest": Room(
-            (66, 137, 91),
-            [floor, pygame.Rect(0, 205, 280, 18), pygame.Rect(680, 205, 280, 18),
-             pygame.Rect(360, 385, 240, 18)],
-            [Door(35, 452, "hub", (865, 550), "HUB"),
-             Door(859, 107, "crimson", (120, 550), "LOOP")],
-            enemies=[Enemy(525, 385, -1, 85)],
-            ammo=[pygame.Rect(165, 170, 18, 18)],
-            title="FOREST"
-        ),
-        # Screen 5
-        "amber": Room(
-            (194, 138, 48),
-            [floor, pygame.Rect(0, 250, 180, 18), pygame.Rect(780, 250, 180, 18),
-             pygame.Rect(265, 450, 130, 18), pygame.Rect(490, 350, 130, 18),
-             pygame.Rect(645, 265, 90, 18)],
-            [Door(35, 452, "hub", (865, 550), "HUB"),
-             Door(859, 152, "vault", (115, 550), "DEEP")],
-            enemies=[Enemy(665, 265, -1, 90), Enemy(530, 350, 1, 125)],
-            title="AMBER"
-        ),
-        # Screen 6
-        "violet": Room(
-            (123, 79, 159),
-            [floor, pygame.Rect(0, 300, 250, 18), pygame.Rect(710, 300, 250, 18),
-             pygame.Rect(315, 425, 150, 18), pygame.Rect(505, 320, 110, 18),
-             pygame.Rect(395, 205, 165, 18)],
-            [Door(35, 452, "hub", (865, 550), "HUB"),
-             Door(859, 202, "vault", (115, 550), "LOCK", key_id="violet_key")],
-            keys=[Pickup(pygame.Rect(455, 170, 18, 18), "violet_key")],
-            title="VIOLET"
-        ),
-        # Screen 7
-        "slate": Room(
-            (83, 94, 103),
-            [floor, pygame.Rect(0, 235, 230, 18), pygame.Rect(730, 235, 230, 18),
-             pygame.Rect(300, 430, 150, 18), pygame.Rect(520, 430, 150, 18),
-             pygame.Rect(405, 300, 150, 18)],
-            [Door(35, 452, "hub", (865, 550), "HUB"),
-             Door(859, 137, "cobalt", (115, 550), "LOOP")],
-            enemies=[Enemy(475, 550, -1, 100)],
-            ammo=[pygame.Rect(455, 265, 18, 18)],
-            title="SLATE"
-        ),
-        # Screen 8
-        "abyss": Room(
-            (34, 37, 52),
-            [floor, pygame.Rect(0, 180, 210, 18), pygame.Rect(750, 180, 210, 18),
-             pygame.Rect(250, 415, 140, 18), pygame.Rect(565, 415, 140, 18),
-             pygame.Rect(410, 295, 135, 18)],
-            [Door(35, 452, "crimson", (865, 550), "BACK"),
-             Door(859, 82, "vault", (115, 550), "INNER")],
-            enemies=[Enemy(455, 295, -1, 65), Enemy(625, 415, 1, 95)],
-            title="ABYSS"
-        ),
-        # Screen 9
-        "vault": Room(
-            (40, 44, 46),
-            [floor, pygame.Rect(0, 270, 230, 18), pygame.Rect(730, 270, 230, 18),
-             pygame.Rect(300, 445, 360, 18), pygame.Rect(390, 320, 180, 18),
-             pygame.Rect(445, 210, 70, 18)],
-            [Door(35, 452, "amber", (865, 550), "BACK"),
-             Door(859, 172, "hub", (115, 550), "RETURN")],
-            enemies=[Enemy(350, 445, 1, 75), Enemy(610, 445, -1, 75)],
-            ammo=[pygame.Rect(470, 175, 18, 18)],
-            title="THE INNER VAULT"
-        ),
-    }
+PLAYER_COLOR = (35, 35, 38)
+ENEMY_COLOR = (76, 19, 22)
 
 
 class Game:
@@ -176,6 +26,7 @@ class Game:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("consolas", 20)
         self.big_font = pygame.font.SysFont("consolas", 32, bold=True)
+        self.player_sprites = self.build_player_sprites()
         self.reset()
 
     def reset(self):
@@ -326,37 +177,136 @@ class Game:
                 return
 
     def update_enemies(self):
-        if self.room_name not in self.rooms:
-            return
         for enemy in self.current_room().enemies:
             if not enemy.alive:
                 continue
             enemy.cooldown -= 1
             if enemy.cooldown <= 0:
                 enemy.facing = 1 if self.x > enemy.x else -1
-                self.enemy_bullets.append([enemy.x + enemy.facing * 16, enemy.y - 30, enemy.facing * 4.2])
+                self.enemy_bullets.append(
+                    [enemy.x + enemy.facing * 16, enemy.y - 30, enemy.facing * 4.2]
+                )
                 enemy.cooldown = 85
 
-    def draw_stickman(self, x, y, facing=1, enemy=False):
-        color = (35, 35, 38) if not enemy else (76, 19, 22)
-        x, y = int(x), int(y)
-        pygame.draw.circle(self.screen, color, (x, y - 42), 8, 2)
-        pygame.draw.line(self.screen, color, (x, y - 34), (x, y - 16), 2)
-        pygame.draw.line(self.screen, color, (x, y - 28), (x + 10 * facing, y - 22), 2)
-        pygame.draw.line(self.screen, color, (x, y - 28), (x - 8 * facing, y - 21), 2)
-        pygame.draw.line(self.screen, color, (x, y - 16), (x + 8, y), 2)
-        pygame.draw.line(self.screen, color, (x, y - 16), (x - 8, y), 2)
+    def build_player_sprites(self):
+        """Create lightweight two-frame run sprites and mirror them by direction."""
+        right_frames = [
+            self.make_player_sprite(run_frame=0),
+            self.make_player_sprite(run_frame=1),
+        ]
+        right_idle = self.make_player_sprite(run_frame=None)
+        return {
+            1: {"idle": right_idle, "run": right_frames},
+            -1: {
+                "idle": pygame.transform.flip(right_idle, True, False),
+                "run": [pygame.transform.flip(frame, True, False) for frame in right_frames],
+            },
+        }
 
-    def draw_door(self, door):
+    def make_player_sprite(self, run_frame):
+        surface = pygame.Surface((42, 58), pygame.SRCALPHA)
+        color = PLAYER_COLOR
+
+        pygame.draw.circle(surface, color, (21, 9), 8, 2)
+        pygame.draw.line(surface, color, (21, 17), (21, 37), 3)
+
+        if run_frame is None:
+            pygame.draw.line(surface, color, (21, 23), (33, 29), 3)
+            pygame.draw.line(surface, color, (21, 23), (11, 29), 3)
+            pygame.draw.line(surface, color, (21, 37), (31, 55), 3)
+            pygame.draw.line(surface, color, (21, 37), (11, 55), 3)
+        elif run_frame == 0:
+            pygame.draw.line(surface, color, (21, 23), (35, 18), 3)
+            pygame.draw.line(surface, color, (21, 23), (9, 32), 3)
+            pygame.draw.line(surface, color, (21, 37), (36, 49), 3)
+            pygame.draw.line(surface, color, (21, 37), (9, 55), 3)
+        else:
+            pygame.draw.line(surface, color, (21, 23), (34, 32), 3)
+            pygame.draw.line(surface, color, (21, 23), (8, 18), 3)
+            pygame.draw.line(surface, color, (21, 37), (34, 55), 3)
+            pygame.draw.line(surface, color, (21, 37), (8, 49), 3)
+
+        return surface
+
+    def draw_player(self):
+        moving = abs(self.vx) > 0.1
+        if moving:
+            frame_index = (pygame.time.get_ticks() // 110) % 2
+            sprite = self.player_sprites[self.facing]["run"][frame_index]
+        else:
+            sprite = self.player_sprites[self.facing]["idle"]
+
+        rect = sprite.get_rect(midbottom=(int(self.x), int(self.y)))
+        self.screen.blit(sprite, rect)
+
+    def draw_enemy(self, x, y, facing=1):
+        x, y = int(x), int(y)
+        pygame.draw.circle(self.screen, ENEMY_COLOR, (x, y - 42), 8, 2)
+        pygame.draw.line(self.screen, ENEMY_COLOR, (x, y - 34), (x, y - 16), 2)
+        pygame.draw.line(
+            self.screen, ENEMY_COLOR, (x, y - 28), (x + 10 * facing, y - 22), 2
+        )
+        pygame.draw.line(
+            self.screen, ENEMY_COLOR, (x, y - 28), (x - 8 * facing, y - 21), 2
+        )
+        pygame.draw.line(self.screen, ENEMY_COLOR, (x, y - 16), (x + 8, y), 2)
+        pygame.draw.line(self.screen, ENEMY_COLOR, (x, y - 16), (x - 8, y), 2)
+
+    def draw_door(self, door: Door):
         unlocked = (not door.key_id or door.key_id in self.inventory) and (
             not door.flag_id or door.flag_id in self.flags
         )
         color = (222, 218, 200) if unlocked else (62, 61, 64)
-        pygame.draw.rect(self.screen, color, door.rect, border_radius=14)
-        pygame.draw.rect(self.screen, BLACK, door.rect, 3, border_radius=14)
-        pygame.draw.circle(self.screen, BLACK, (door.x + 51, door.y + 51), 3)
-        label = self.font.render(door.label, True, BLACK if unlocked else WHITE)
-        self.screen.blit(label, (door.x + door.rect.width // 2 - label.get_width() // 2, door.y - 24))
+        rect = door.rect
+
+        # Arch-shaped top with straight vertical sides down to the floor/platform.
+        arch_height = rect.width // 2
+        arch_box = pygame.Rect(rect.x, rect.y, rect.width, arch_height * 2)
+        body = pygame.Rect(
+            rect.x,
+            rect.y + arch_height,
+            rect.width,
+            rect.height - arch_height,
+        )
+
+        pygame.draw.ellipse(self.screen, color, arch_box)
+        pygame.draw.rect(self.screen, color, body)
+
+        pygame.draw.arc(
+            self.screen,
+            BLACK,
+            arch_box,
+            0,
+            math.pi,
+            3,
+        )
+        pygame.draw.line(
+            self.screen,
+            BLACK,
+            (rect.left, rect.y + arch_height),
+            (rect.left, rect.bottom),
+            3,
+        )
+        pygame.draw.line(
+            self.screen,
+            BLACK,
+            (rect.right - 1, rect.y + arch_height),
+            (rect.right - 1, rect.bottom),
+            3,
+        )
+        pygame.draw.line(
+            self.screen,
+            BLACK,
+            (rect.left, rect.bottom - 1),
+            (rect.right - 1, rect.bottom - 1),
+            3,
+        )
+        pygame.draw.circle(
+            self.screen,
+            BLACK,
+            (rect.right - 14, rect.y + arch_height + 28),
+            3,
+        )
 
     def draw(self):
         room = self.current_room()
@@ -374,8 +324,13 @@ class Game:
 
         for pickup in room.keys:
             pygame.draw.circle(self.screen, (238, 209, 74), pickup.rect.center, 8)
-            pygame.draw.line(self.screen, BLACK, pickup.rect.center,
-                             (pickup.rect.centerx + 13, pickup.rect.centery), 3)
+            pygame.draw.line(
+                self.screen,
+                BLACK,
+                pickup.rect.center,
+                (pickup.rect.centerx + 13, pickup.rect.centery),
+                3,
+            )
 
         for pickup in room.switches:
             pygame.draw.rect(self.screen, (76, 215, 228), pickup.rect)
@@ -383,23 +338,34 @@ class Game:
 
         for enemy in room.enemies:
             if enemy.alive:
-                self.draw_stickman(enemy.x, enemy.y, enemy.facing, enemy=True)
+                self.draw_enemy(enemy.x, enemy.y, enemy.facing)
 
         for bullet in self.bullets:
-            pygame.draw.circle(self.screen, (250, 243, 166), (int(bullet[0]), int(bullet[1])), 4)
+            pygame.draw.circle(
+                self.screen, (250, 243, 166), (int(bullet[0]), int(bullet[1])), 4
+            )
         for bullet in self.enemy_bullets:
-            pygame.draw.circle(self.screen, (247, 110, 80), (int(bullet[0]), int(bullet[1])), 5)
+            pygame.draw.circle(
+                self.screen, (247, 110, 80), (int(bullet[0]), int(bullet[1])), 5
+            )
 
-        self.draw_stickman(self.x, self.y, self.facing)
+        self.draw_player()
 
         title = self.big_font.render(room.title, True, WHITE)
         self.screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 16))
 
-        inventory_text = f"Ammo {self.ammo}   Keys {len(self.inventory)}   Switches {len(self.flags)}"
+        inventory_text = (
+            f"Ammo {self.ammo}   Keys {len(self.inventory)}   "
+            f"Switches {len(self.flags)}"
+        )
         hud = self.font.render(inventory_text, True, WHITE)
         self.screen.blit(hud, (18, HEIGHT - 32))
 
-        help_text = self.font.render("Move A/D or ←/→  Jump W/↑/Space  Shoot/Punch Z/J/Ctrl  R restart", True, WHITE)
+        help_text = self.font.render(
+            "Move A/D or ←/→  Jump W/↑/Space  Shoot/Punch Z/J/Ctrl  R restart",
+            True,
+            WHITE,
+        )
         self.screen.blit(help_text, (WIDTH - help_text.get_width() - 18, HEIGHT - 32))
 
         pygame.display.flip()
