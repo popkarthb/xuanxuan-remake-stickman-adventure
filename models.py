@@ -9,10 +9,16 @@ DOOR_HEIGHT = 98
 
 @dataclass
 class Door:
+    """A physical door placed in a room.
+
+    Door routing is intentionally NOT stored on the door itself. Each door has
+    an ID and levels.py defines a directional route for that ID. This allows
+    one-way routes and many doors to lead to the same destination.
+    """
+
+    door_id: str
     x: int
     y: int
-    target: str
-    spawn: tuple[int, int]
     key_id: str | None = None
     flag_id: str | None = None
 
@@ -21,10 +27,23 @@ class Door:
         return pygame.Rect(self.x, self.y, DOOR_WIDTH, DOOR_HEIGHT)
 
 
+@dataclass(frozen=True)
+class DoorLink:
+    target_room: str
+    target_spawn: str
+
+
 @dataclass
-class Pickup:
+class ItemPickup:
     rect: pygame.Rect
-    item_id: str = ""
+    kind: str
+    item_id: str
+
+
+@dataclass
+class BreakablePlatform:
+    rect: pygame.Rect
+    break_id: str
 
 
 @dataclass
@@ -45,8 +64,11 @@ class Room:
     color: tuple[int, int, int]
     platforms: list[pygame.Rect]
     doors: list[Door]
+    spawns: dict[str, tuple[int, int]]
     enemies: list[Enemy] = field(default_factory=list)
-    ammo: list[pygame.Rect] = field(default_factory=list)
-    keys: list[Pickup] = field(default_factory=list)
-    switches: list[Pickup] = field(default_factory=list)
+    items: list[ItemPickup] = field(default_factory=list)
+    breakables: list[BreakablePlatform] = field(default_factory=list)
     title: str = ""
+
+    def solid_rects(self) -> list[pygame.Rect]:
+        return self.platforms + [platform.rect for platform in self.breakables]
