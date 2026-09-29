@@ -54,13 +54,31 @@ The game name is:
 
 Do not use map mechanics, room layouts, or individual level concepts as the game title.
 
+## Architecture Boundaries
+
+- Keep reusable room/entity data structures in `models.py`.
+- Keep room geometry, spawn points, door routes, enemies, keys, items, switches, and other level-specific configuration in `levels.py`.
+- Keep the main loop, input, physics, collision, combat, item interaction, and rendering framework in `main.py`.
+- Do not move hard-coded room layouts back into `main.py`.
+
+## Door Routing Rules
+
+Door routing is **directional**.
+
+- Never assume two doors are automatically paired.
+- Never infer a reverse route from an existing forward route.
+- Multiple source doors may intentionally lead to the same destination room and spawn point.
+- A door may intentionally be part of a one-way path.
+- Upper-level entries may intentionally drop the player to a lower level with no way to return through the same route.
+- Keep the current route table in `levels.py`.
+- Treat current routes marked as demo/temporary as provisional until the puzzle and level design is finalized.
+
 ## Development Guidance
 
 - Keep changes focused and understandable.
-- Preserve working behavior when refactoring.
+- Preserve working movement and physics behavior unless a change specifically requires modifying it.
 - Test gameplay changes before committing them when practical.
 - Keep public documentation aligned with the current game behavior.
-- Keep room layouts, room connections, platforms, enemies, keys, switches, and other level-specific configuration in `levels.py` rather than embedding them in `main.py`.
-- Keep reusable room/entity data structures in `models.py`; keep the main loop, physics, collision, combat, input, and rendering framework in `main.py`.
+- Keep doors free of visible text labels unless the project requirements explicitly change.
 - Store README screenshots and other public project images under `image/`.
 - Verify all image assets are safe for public release before committing them.
