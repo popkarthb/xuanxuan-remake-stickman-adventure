@@ -134,8 +134,8 @@ def make_rooms() -> dict[str, Room]:
             (83, 94, 103),
             [
                 floor,
-                pygame.Rect(300, 430, 150, 18),
-                pygame.Rect(520, 430, 150, 18),
+                pygame.Rect(300, 435, 150, 18),
+                pygame.Rect(520, 435, 150, 18),
                 pygame.Rect(405, 315, 150, 18),
                 pygame.Rect(0, 235, 230, 18),
                 pygame.Rect(730, 235, 230, 18),
@@ -152,8 +152,8 @@ def make_rooms() -> dict[str, Room]:
             (34, 37, 52),
             [
                 floor,
-                pygame.Rect(250, 430, 140, 18),
-                pygame.Rect(565, 430, 140, 18),
+                pygame.Rect(250, 435, 140, 18),
+                pygame.Rect(565, 435, 140, 18),
                 pygame.Rect(410, 315, 135, 18),
                 pygame.Rect(300, 215, 150, 18),
                 pygame.Rect(0, 180, 210, 18),
@@ -163,7 +163,7 @@ def make_rooms() -> dict[str, Room]:
                 Door(35, 452, "crimson", (865, 550)),
                 Door(859, 82, "vault", (115, 550)),
             ],
-            enemies=[Enemy(455, 315, -1, 65), Enemy(625, 430, 1, 95)],
+            enemies=[Enemy(455, 315, -1, 65), Enemy(625, 435, 1, 95)],
             title="ABYSS",
         ),
         "vault": Room(
